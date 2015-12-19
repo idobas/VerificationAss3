@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/Ex3/Ex3.iml" filepath="$PROJECT_DIR$/Ex3/Ex3.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Ex3ExampleSolution/Ex3ExampleSolution.iml" filepath="$PROJECT_DIR$/Ex3ExampleSolution/Ex3ExampleSolution.iml" />
+    </modules>
+  </component>
+</project>

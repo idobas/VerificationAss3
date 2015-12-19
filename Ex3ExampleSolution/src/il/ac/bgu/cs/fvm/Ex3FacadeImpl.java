@@ -585,27 +585,221 @@ public class Ex3FacadeImpl implements Ex3Facade {
         NanoPromelaParser.StmtContext root = NanoPromelaFileReader.pareseNanoPromelaFile(filename);
         createLocationsPGfromNP(root, ans);
         createTransitionsPGfromNP(root, ans);
+
+        fixLocationsAndTransitions(ans);
+        makeComplexTransitions(ans);
+        fixAgain(ans);
         return ans;
     }
 
+    private void fixAgain(ProgramGraph ans) {
+        Set<PGTransition> notOkTransitions = new HashSet<>();
+        for (PGTransition tr1 : ans.getTransitions()
+                ) {
+            boolean bool = false;
+            Set<PGTransition> temp = new HashSet<>(ans.getTransitions());
+            temp.remove(tr1);
+            for (PGTransition tr2 : temp
+                    ) {
+                if (tr1.getFrom().getLabel().equals(tr2.getTo().getLabel()) && ans.getLocations().contains(tr2.getTo()))
+                    bool = true;
+            }
+            if (!bool)
+                notOkTransitions.add(tr1);
+        }
+        Set<PGTransition> toRemove = new HashSet<>();
+        for (PGTransition tr : notOkTransitions
+                ) {
+            if (ans.getInitialLocations().contains(tr.getFrom()))
+                toRemove.add(tr);
+        }
+        notOkTransitions.removeAll(toRemove);
+        notOkTransitions.forEach(ans::removeTransition);
+    }
+
+    private void fixLocationsAndTransitions(ProgramGraph ans) {
+        Set<Location> notOkLocations = new HashSet<>();
+        for (Location l : ans.getLocations()
+                ) {
+            boolean bool = false;
+            for (PGTransition tr : ans.getTransitions()
+                    ) {
+                if (l.getLabel().equals(tr.getTo().getLabel()) && !ans.getInitialLocations().contains(l)) {
+                    bool = true;
+                }
+            }
+            if (!bool) {
+                notOkLocations.add(l);
+            }
+        }
+        notOkLocations.removeAll(ans.getInitialLocations());
+        notOkLocations.forEach(ans::removeLocation);
+
+        Set<PGTransition> notOkTransitions = new HashSet<>();
+        for (PGTransition tr : ans.getTransitions()
+                ) {
+            boolean bool = false;
+            for (Location l : notOkLocations
+                    ) {
+                if (tr.getFrom().getLabel().equals(l.getLabel())) {
+                    bool = true;
+                }
+            }
+            if (bool) {
+                notOkTransitions.add(tr);
+            }
+        }
+        notOkTransitions.forEach(ans::removeTransition);
+    }
+
+    private void makeComplexTransitions(ProgramGraph ans) {
+        Set<PGTransition> temp = createTransitionsForComplex(ans);
+        temp.forEach(ans::addTransition);
+    }
+
+    private Set<PGTransition> createTransitionsForComplex(ProgramGraph ans) {
+        Set<PGTransition> temp = new HashSet<>();
+        for (Location l : ans.getLocations()
+                ) {
+            if (l.getLabel().contains(";") && !ans.getInitialLocations().contains(l)) {
+                NanoPromelaParser.StmtContext head = NanoPromelaFileReader.pareseNanoPromelaString(l.getLabel().substring(1, l.getLabel().length() - 1));
+                getTransitionsForConcatenation(head, temp);
+            }
+        }
+        return temp;
+    }
+
     private void createTransitionsPGfromNP(NanoPromelaParser.StmtContext root, ProgramGraph ans) {
-        //SKIP case
+        Set<PGTransition> basicTrans = getTransitionsGoingToExit(root, new HashSet<>());
+        basicTrans.forEach(ans::addTransition);
+    }
+
+    private Set<PGTransition> getTransitionsGoingToExit(NanoPromelaParser.StmtContext root, Set<PGTransition> ans) {
         if (root.skipstmt() != null) {
-            ans.addTransition(new PGTransition(new Location(root.getText()), "", "", new Location("[]")));
+            ans.add(new PGTransition(new Location("[" + root.getText() + "]"), "", "", new Location("[]")));
+        } else if (root.assstmt() != null || root.chanwritestmt() != null || root.chanreadstmt() != null || root.atomicstmt() != null) {
+            ans.add(new PGTransition(new Location("[" + root.getText() + "]"), "", root.getText(), new Location("[]")));
+        } else if (root.ifstmt() != null) {
+            getTransitionsForIfStmt(root, ans);
+        } else if (root.dostmt() != null) {
+            getTransitionsForDoStmt(root, ans);
+        } else {
+            getTransitionsForConcatenation(root, ans);
         }
-        //assignment case
-        if (root.assstmt() != null) {
-            ans.addTransition(new PGTransition(new Location(root.getText()), "", root.getText(), new Location("[]")));
+        return ans;
+    }
+
+    private void getTransitionsForConcatenation(NanoPromelaParser.StmtContext root, Set<PGTransition> ans) {
+        if (!root.stmt().isEmpty()) {
+            for (NanoPromelaParser.StmtContext stmt : root.stmt()
+                    ) {
+                ans.addAll(getTransitionsGoingToExit(stmt, new HashSet<>()));
+            }
+            Set<PGTransition> temp = new HashSet<>(ans);
+            for (PGTransition tr : temp
+                    ) {
+                String f = tr.getFrom().getLabel().substring(1, tr.getFrom().getLabel().length() - 1);
+                if (root.stmt().get(0).getText().equals(f) && !tr.getTo().getLabel().equals("[]")) {
+                    Location from = new Location("[" + root.getText() + "]");
+                    Location to = new Location("[" + tr.getTo().getLabel().substring(1, tr.getTo().getLabel().length() - 1) + ";" + root.stmt().get(1).getText() + "]");
+                    String action = tr.getAction();
+                    String condition = tr.getCondition();
+                    ans.add(new PGTransition(from, condition, action, to));
+                } else if (root.stmt().get(0).getText().equals(f) && tr.getTo().getLabel().equals("[]")) {
+                    Location from = new Location("[" + root.getText() + "]");
+                    Location to = new Location("[" + root.stmt().get(1).getText() + "]");
+                    String action = tr.getAction();
+                    String condition = tr.getCondition();
+                    ans.add(new PGTransition(from, condition, action, to));
+                }
+            }
         }
-        //channels case
-        if (root.chanwritestmt() != null || root.chanreadstmt() != null) {
-            ans.addTransition(new PGTransition(new Location(root.getText()), "", root.getText(), new Location("[]")));
+    }
+
+    private void getTransitionsForDoStmt(NanoPromelaParser.StmtContext root, Set<PGTransition> ans) {
+        for (NanoPromelaParser.OptionContext oc : root.dostmt().option()
+                ) {
+            Set<PGTransition> subTransitions = getTransitionsGoingToExit(oc.stmt(), new HashSet<>());
+            ans.addAll(subTransitions);
+            for (PGTransition tr : subTransitions
+                    ) {
+                String f = tr.getFrom().getLabel().substring(1, tr.getFrom().getLabel().length() - 1);
+
+                if (f.equals(oc.stmt().getText()) && tr.getTo().getLabel().equals("[]")) {
+
+                    Location from = new Location("[" + root.getText() + "]");
+                    Location to = new Location("[" + root.getText() + "]");
+                    String action = tr.getAction();
+                    String condition;
+                    if (!tr.getCondition().equals(""))
+                        condition = "(" + oc.boolexpr().getText() + ") && (" + tr.getCondition() + ")";
+                    else
+                        condition = "(" + oc.boolexpr().getText() + ")";
+                    ans.add(new PGTransition(from, condition, action, to));
+                } else if (f.equals(oc.stmt().getText()) && !tr.getTo().getLabel().equals("[]")) {
+                    String f2 = tr.getTo().getLabel().substring(1, tr.getTo().getLabel().length() - 1);
+                    Location from = new Location("[" + root.getText() + "]");
+                    Location to = new Location("[" + f2 + ";" + root.getText() + "]");
+                    String action = tr.getAction();
+                    String condition;
+                    if (!tr.getCondition().equals(""))
+                        condition = "(" + oc.boolexpr().getText() + ") && (" + tr.getCondition() + ")";
+                    else
+                        condition = "(" + oc.boolexpr().getText() + ")";
+                    ans.add(new PGTransition(from, condition, action, to));
+                }
+            }
+        }
+        Location from = new Location("[" + root.getText() + "]");
+        Location to = new Location("[]");
+        String action = "";
+        StringBuilder sb = new StringBuilder("!(");
+        for (NanoPromelaParser.OptionContext oc : root.dostmt().option()
+                ) {
+            sb.append("(" + oc.boolexpr().getText() + ")");
+        }
+        sb.append(")");
+        String condition = sb.toString();
+        ans.add(new PGTransition(from, condition, action, to));
+    }
+
+    private void getTransitionsForIfStmt(NanoPromelaParser.StmtContext root, Set<PGTransition> ans) {
+        for (NanoPromelaParser.OptionContext oc : root.ifstmt().option()
+                ) {
+            Set<PGTransition> subTransitions = getTransitionsGoingToExit(oc.stmt(), new HashSet<>());
+            ans.addAll(subTransitions);
+            for (PGTransition tr : subTransitions
+                    ) {
+                String f = tr.getFrom().getLabel().substring(1, tr.getFrom().getLabel().length() - 1);
+                if (f.equals(oc.stmt().getText())) {
+                    Location from = new Location("[" + root.getText() + "]");
+                    Location to;
+                    //if (!tr.getTo().getLabel().equals("[]"))
+                    to = new Location(tr.getTo().getLabel());
+                    // else
+                    // to = new Location(tr.getTo().getLabel());
+                    String condition;
+                    if (!tr.getCondition().equals(""))
+                        condition = "(" + oc.boolexpr().getText() + ") && (" + tr.getCondition() + ")";
+                    else
+                        condition = "(" + oc.boolexpr().getText() + ")";
+                    String action = tr.getAction();
+                    ans.add(new PGTransition(from, condition, action, to));
+                }
+            }
         }
     }
 
     private void createLocationsPGfromNP(NanoPromelaParser.StmtContext root, ProgramGraph ans) {
         Set<Location> locs = getSub(root);
-        locs.forEach(ans::addLocation);
+        ans.addInitialLocation(new Location("[" + root.getText() + "]"));
+        for (Location l : locs
+                ) {
+            if (!l.getLabel().equals("[]"))
+                ans.addLocation(new Location("[" + l.getLabel() + "]"));
+            else
+                ans.addLocation(l);
+        }
     }
 
     private Set<Location> getSub(NanoPromelaParser.StmtContext stmt) {
@@ -627,11 +821,13 @@ public class Ex3FacadeImpl implements Ex3Facade {
             ans.add(new Location("[]"));
             for (NanoPromelaParser.OptionContext oc : stmt.dostmt().option()
                     ) {
-                ans.addAll(sub(oc.stmt(), ans));
+                Set<Location> temp = sub(oc.stmt(), new HashSet<>());
+                ans.addAll(temp.stream().filter(l -> !l.getLabel().equals("[]")).map(l -> new Location(l.getLabel() + ";" + stmt.getText())).collect(Collectors.toList()));
+                //ans.addAll(sub(oc.stmt(), ans));
             }
         } else {
-            Set<Location> subOfStmt1 = sub(stmt.stmt().get(0),new HashSet<>());
-            Set<Location> subOfStmt2 = sub(stmt.stmt().get(1),new HashSet<>());
+            Set<Location> subOfStmt1 = sub(stmt.stmt().get(0), new HashSet<>());
+            Set<Location> subOfStmt2 = sub(stmt.stmt().get(1), new HashSet<>());
             ans.addAll(subOfStmt1.stream().filter(l -> !l.getLabel().equals("[]")).map(l -> new Location(l.getLabel() + ";" + stmt.stmt().get(1).getText())).collect(Collectors.toList()));
             ans.addAll(subOfStmt2.stream().map(l -> new Location(l.getLabel())).collect(Collectors.toList()));
         }
@@ -644,6 +840,14 @@ public class Ex3FacadeImpl implements Ex3Facade {
 
     @Override
     public ProgramGraph programGraphFromNanoPromelaString(String nanopromela) throws Exception {
-        throw new UnsupportedOperationException();
+        ProgramGraph ans = new ProgramGraphImpl();
+        NanoPromelaParser.StmtContext root = NanoPromelaFileReader.pareseNanoPromelaString(nanopromela);
+        createLocationsPGfromNP(root, ans);
+        createTransitionsPGfromNP(root, ans);
+
+        fixLocationsAndTransitions(ans);
+        makeComplexTransitions(ans);
+        fixAgain(ans);
+        return ans;
     }
 }
