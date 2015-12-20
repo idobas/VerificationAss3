@@ -125,7 +125,7 @@ public class TransitionImpl implements TransitionSystem {
             if (t.getAction().equals(action))
                 throw new DeletionOfAttachedActionException(action, TransitionSystemPart.ACTIONS);
         }
-        this.transitions.remove(action);
+        this.actions.remove(action);
     }
 
     @Override

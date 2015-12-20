@@ -24,7 +24,7 @@ import il.ac.bgu.cs.fvm.transitionsystem.TransitionSystem;
 public class NanoPromelaTest {
 
 	Ex3FacadeImpl Ex3FacadeImpl = new Ex3FacadeImpl();
-	
+
 	@Test
 	public void test1() throws Exception {
 		String filename = "bin\\il\\ac\\bgu\\cs\\fvm\\nanopromela\\tst1.np";
@@ -158,13 +158,13 @@ public class NanoPromelaTest {
 		assertEquals(pg.getLocations(), exp.getLocations());
 		assertEquals(pg.getInitialLocations(), exp.getInitialLocations());
 		assertEquals(pg.getTransitions(), exp.getTransitions());
-		
+
 		Set<ActionDef> ad = new HashSet<ActionDef>() {
 			{
 				add(new ParserBasedActDef());
 			}
 		};
-		
+
 		Set<ConditionDef> cd = new HashSet<ConditionDef>() {
 			{
 				add(new ParserBasedCondDef());
@@ -172,8 +172,13 @@ public class NanoPromelaTest {
 		};
 
 		TransitionSystem ts = Ex3FacadeImpl.transitionSystemFromProgramGraph(pg, ad, cd);
-
-		assertEquals(ts, expected4TS());
+        TransitionSystem expected = expected4TS();
+        assertEquals(expected.getInitialStates(), ts.getInitialStates());
+        assertEquals(expected.getStates(), ts.getStates());
+        assertEquals(expected.getTransitions(), ts.getTransitions());
+        assertEquals(expected.getActions(), ts.getActions());
+        assertEquals(expected.getAtomicPropositions(), ts.getAtomicPropositions());
+        assertEquals(expected.getLabelingFunction(), ts.getLabelingFunction());
 
 	}
 
@@ -436,8 +441,8 @@ public class NanoPromelaTest {
 		assertEquals(pg.getLocations(), exp.getLocations());
 		assertEquals(pg.getInitialLocations(), exp.getInitialLocations());
 		assertEquals(pg.getTransitions(), exp.getTransitions());
-		
-		
+
+
 		Set<ActionDef> ad = new HashSet<ActionDef>() {
 			{
 				add(new ParserBasedActDef());
@@ -450,8 +455,13 @@ public class NanoPromelaTest {
 		};
 
 		TransitionSystem ts = Ex3FacadeImpl.transitionSystemFromProgramGraph(pg, ad, cd);
-
-		assertEquals(ts, expectedloopTS());
+        TransitionSystem expected = expectedloopTS();
+        assertEquals(expected.getInitialStates(), ts.getInitialStates());
+        assertEquals(expected.getStates(), ts.getStates());
+        assertEquals(expected.getTransitions(), ts.getTransitions());
+        assertEquals(expected.getActions(), ts.getActions());
+        assertEquals(expected.getAtomicPropositions(), ts.getAtomicPropositions());
+        assertEquals(expected.getLabelingFunction(), ts.getLabelingFunction());
 
 	}
 

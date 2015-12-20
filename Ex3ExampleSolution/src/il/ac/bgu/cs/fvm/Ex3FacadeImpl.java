@@ -498,7 +498,7 @@ public class Ex3FacadeImpl implements Ex3Facade {
         TransitionSystem ans = new TransitionImpl();
         addInitialStatesForTransSystemFromProgGraph(pg, ans);
         addActionsTransSystemFromProg(pg, ans);
-        addAtomicPropsTransFromProg(pg, ans);
+        //addAtomicPropsTransFromProg(pg, ans);
 
 
         pg.getTransitions().stream().filter(trans -> pg.getInitialLocations().contains(trans.getFrom())).forEach(trans -> {
@@ -514,7 +514,22 @@ public class Ex3FacadeImpl implements Ex3Facade {
             }
             bfs(ans, trans.getFrom(), pg, eval, actionDefs, conditionDefs, new HashSet<>());
         });
-
+        Set<Action> toRemove = new HashSet<>();
+        for (Action a:ans.getActions()
+             ) {
+            boolean bool = false;
+            for (Transition tr:ans.getTransitions()
+                 ) {
+                if (tr.getAction().equals(a))
+                    bool = true;
+            }
+            if (!bool)
+                toRemove.add(a);
+        }
+        for (Action a:toRemove
+             ) {
+            ans.removeAction(a);
+        }
         return ans;
     }
 
@@ -528,20 +543,31 @@ public class Ex3FacadeImpl implements Ex3Facade {
                     ) {
                 sb.append(e.getKey() + "=" + e.getValue() + ",");
             }
-            State newState = new State("[location=" + trans.getTo().getLabel() + ", eval={" + sb.toString().substring(0, sb.toString().length() - 1) + "}]");
-            ans.addState(newState);
-
-            ans.addLabel(newState, sb.toString().substring(0, sb.toString().length() - 1));
-            StringBuilder sb2 = new StringBuilder();
-            for (Map.Entry e : eval.entrySet()
-                    ) {
-                sb2.append(e.getKey() + "=" + e.getValue() + ",");
-            }
-            State fromState = new State("[location=" + trans.getFrom().getLabel() + ", eval={" + sb2.toString().substring(0, sb2.toString().length() - 1) + "}]");
-            if (ans.getStates().contains(fromState))
+            if (sb.toString().length() > 0) {
+                State newState = new State("[location=" + trans.getTo().getLabel() + ", eval={" + sb.toString().substring(0, sb.toString().length() - 1) + "}]");
+                ans.addState(newState);
+                ans.addAtomicProposition(sb.toString().substring(0, sb.toString().length() - 1).replace("="," = "));
+                ans.addLabel(newState, sb.toString().substring(0, sb.toString().length() - 1).replace("="," = "));
+                StringBuilder sb2 = new StringBuilder();
+                for (Map.Entry e : eval.entrySet()
+                        ) {
+                    sb2.append(e.getKey() + "=" + e.getValue() + ",");
+                }
+                if (sb2.toString().length() >0) {
+                    State fromState = new State("[location=" + trans.getFrom().getLabel() + ", eval={" + sb2.toString().substring(0, sb2.toString().length() - 1) + "}]");
+                    if (ans.getStates().contains(fromState))
+                        ans.addTransition(new Transition(fromState, new Action(trans.getAction()), newState));
+                    if (!saw.contains(trans.getTo()))
+                        bfs(ans, trans.getTo(), pg, newVals, actionDefs, conditionDefs, saw);
+                }
+            } else {
+                State newState = new State("[location=[], eval={}]");
+                ans.addState(newState);
+                State fromState = new State("[location=" + trans.getFrom().getLabel() + ", eval={}]");
+                ans.addState(fromState);
                 ans.addTransition(new Transition(fromState, new Action(trans.getAction()), newState));
-            if (!saw.contains(trans.getTo()))
-                bfs(ans, trans.getTo(), pg, newVals, actionDefs, conditionDefs, saw);
+
+            }
         });
     }
 
@@ -564,16 +590,22 @@ public class Ex3FacadeImpl implements Ex3Facade {
     private void addInitialStatesForTransSystemFromProgGraph(ProgramGraph pg, TransitionSystem ans) {
         for (Location loc : pg.getInitialLocations()
                 ) {
-            for (List<String> ls : pg.getInitalizations()
-                    ) {
-                StringBuilder sb = new StringBuilder();
-                for (String s : ls
+            if (pg.getInitalizations().size() > 0) {
+                for (List<String> ls : pg.getInitalizations()
                         ) {
-                    sb.append(s.split(":")[0] + s.split(":")[1] + ",");
+                    StringBuilder sb = new StringBuilder();
+                    for (String s : ls
+                            ) {
+                        sb.append(s.split(":")[0] + s.split(":")[1] + ",");
+                    }
+                    State newState = new State("[location=" + loc.getLabel() + ", eval=" + "{" + sb.toString().substring(0, sb.toString().length() - 1) + "}]");
+                    ans.addState(newState);
+                    ans.addInitialState(newState);
                 }
-                State newState = new State("[location=" + loc.getLabel() + ", eval=" + "{" + sb.toString().substring(0, sb.toString().length() - 1) + "}]");
-                ans.addState(newState);
-                ans.addInitialState(newState);
+            }
+            else{
+                ans.addState(new State("[location=" + loc.getLabel() + ", eval=" + "{}]"));
+                ans.addInitialState(new State("[location=" + loc.getLabel() + ", eval=" + "{}]"));
             }
         }
     }
@@ -586,8 +618,9 @@ public class Ex3FacadeImpl implements Ex3Facade {
         createLocationsPGfromNP(root, ans);
         createTransitionsPGfromNP(root, ans);
 
-        fixLocationsAndTransitions(ans);
+
         makeComplexTransitions(ans);
+        fixLocationsAndTransitions(ans);
         fixAgain(ans);
         return ans;
     }
@@ -662,7 +695,10 @@ public class Ex3FacadeImpl implements Ex3Facade {
         for (Location l : ans.getLocations()
                 ) {
             if (l.getLabel().contains(";") && !ans.getInitialLocations().contains(l)) {
-                NanoPromelaParser.StmtContext head = NanoPromelaFileReader.pareseNanoPromelaString(l.getLabel().substring(1, l.getLabel().length() - 1));
+                String toParse = l.getLabel().substring(1, l.getLabel().length() - 1).replace("do", "do ").replace("od", " od").replace("if","if ").replace("fi"," fi");
+                if (toParse.contains("odo"))
+                    toParse = toParse.replace("odo d","od od");
+                NanoPromelaParser.StmtContext head = NanoPromelaFileReader.pareseNanoPromelaString(toParse);
                 getTransitionsForConcatenation(head, temp);
             }
         }
@@ -676,7 +712,7 @@ public class Ex3FacadeImpl implements Ex3Facade {
 
     private Set<PGTransition> getTransitionsGoingToExit(NanoPromelaParser.StmtContext root, Set<PGTransition> ans) {
         if (root.skipstmt() != null) {
-            ans.add(new PGTransition(new Location("[" + root.getText() + "]"), "", "", new Location("[]")));
+            ans.add(new PGTransition(new Location("[" + root.getText() + "]"), "", "skip", new Location("[]")));
         } else if (root.assstmt() != null || root.chanwritestmt() != null || root.chanreadstmt() != null || root.atomicstmt() != null) {
             ans.add(new PGTransition(new Location("[" + root.getText() + "]"), "", root.getText(), new Location("[]")));
         } else if (root.ifstmt() != null) {
@@ -754,9 +790,11 @@ public class Ex3FacadeImpl implements Ex3Facade {
         Location to = new Location("[]");
         String action = "";
         StringBuilder sb = new StringBuilder("!(");
-        for (NanoPromelaParser.OptionContext oc : root.dostmt().option()
-                ) {
-            sb.append("(" + oc.boolexpr().getText() + ")");
+        for (int i = 0; i < root.dostmt().option().size(); i++) {
+            if (i < root.dostmt().option().size() - 1)
+                sb.append("(" + root.dostmt().option().get(i).boolexpr().getText() + ")&&");
+            else
+                sb.append("(" + root.dostmt().option().get(i).boolexpr().getText() + ")");
         }
         sb.append(")");
         String condition = sb.toString();
@@ -774,10 +812,7 @@ public class Ex3FacadeImpl implements Ex3Facade {
                 if (f.equals(oc.stmt().getText())) {
                     Location from = new Location("[" + root.getText() + "]");
                     Location to;
-                    //if (!tr.getTo().getLabel().equals("[]"))
                     to = new Location(tr.getTo().getLabel());
-                    // else
-                    // to = new Location(tr.getTo().getLabel());
                     String condition;
                     if (!tr.getCondition().equals(""))
                         condition = "(" + oc.boolexpr().getText() + ") && (" + tr.getCondition() + ")";
@@ -823,7 +858,6 @@ public class Ex3FacadeImpl implements Ex3Facade {
                     ) {
                 Set<Location> temp = sub(oc.stmt(), new HashSet<>());
                 ans.addAll(temp.stream().filter(l -> !l.getLabel().equals("[]")).map(l -> new Location(l.getLabel() + ";" + stmt.getText())).collect(Collectors.toList()));
-                //ans.addAll(sub(oc.stmt(), ans));
             }
         } else {
             Set<Location> subOfStmt1 = sub(stmt.stmt().get(0), new HashSet<>());
@@ -844,9 +878,8 @@ public class Ex3FacadeImpl implements Ex3Facade {
         NanoPromelaParser.StmtContext root = NanoPromelaFileReader.pareseNanoPromelaString(nanopromela);
         createLocationsPGfromNP(root, ans);
         createTransitionsPGfromNP(root, ans);
-
-        fixLocationsAndTransitions(ans);
         makeComplexTransitions(ans);
+        fixLocationsAndTransitions(ans);
         fixAgain(ans);
         return ans;
     }
