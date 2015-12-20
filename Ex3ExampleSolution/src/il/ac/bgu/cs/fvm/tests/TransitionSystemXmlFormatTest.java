@@ -59,7 +59,11 @@ public class TransitionSystemXmlFormatTest {
 
 		try (StringReader rdr = new StringReader(out)) {
 			TransitionSystem actualTs = sut.read(rdr);
-			assertEquals(originalTs, actualTs);
+			assertEquals(originalTs.getStates(),actualTs.getStates());
+			assertEquals(originalTs.getInitialStates(),actualTs.getInitialStates());
+			assertEquals(originalTs.getTransitions(),actualTs.getTransitions());
+			assertEquals(originalTs.getActions(),actualTs.getActions());
+			assertEquals(originalTs.getAtomicPropositions(),actualTs.getAtomicPropositions());
 
 		} catch (Exception e) {
 			fail("Roundtrip failed: " + e.getMessage());

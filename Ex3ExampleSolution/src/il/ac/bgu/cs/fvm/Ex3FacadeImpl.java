@@ -507,15 +507,17 @@ public class Ex3FacadeImpl implements Ex3Facade {
                     ) {
                 for (String s : ls
                         ) {
-                    String var = s.split(":")[0];
-                    Object val = Integer.parseInt(s.split(":=")[1]);
-                    eval.put(var, val);
+                    if (s.contains(":")) {
+                        String var = s.split(":")[0];
+                        Object val = Integer.parseInt(s.split(":=")[1]);
+                        eval.put(var, val);
+                    }
                 }
             }
             bfs(ans, trans.getFrom(), pg, eval, actionDefs, conditionDefs, new HashSet<>());
         });
         Set<Action> toRemove = new HashSet<>();
-        for (Action a:ans.getActions()
+/*        for (Action a:ans.getActions()
              ) {
             boolean bool = false;
             for (Transition tr:ans.getTransitions()
@@ -529,7 +531,7 @@ public class Ex3FacadeImpl implements Ex3Facade {
         for (Action a:toRemove
              ) {
             ans.removeAction(a);
-        }
+        }*/
         return ans;
     }
 
@@ -541,19 +543,25 @@ public class Ex3FacadeImpl implements Ex3Facade {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry e : newVals.entrySet()
                     ) {
+                //ans.addAtomicProposition(e.getKey() + "=" + e.getValue());
                 sb.append(e.getKey() + "=" + e.getValue() + ",");
             }
             if (sb.toString().length() > 0) {
                 State newState = new State("[location=" + trans.getTo().getLabel() + ", eval={" + sb.toString().substring(0, sb.toString().length() - 1) + "}]");
                 ans.addState(newState);
-                ans.addAtomicProposition(sb.toString().substring(0, sb.toString().length() - 1).replace("="," = "));
-                ans.addLabel(newState, sb.toString().substring(0, sb.toString().length() - 1).replace("="," = "));
+                for (String s:sb.toString().split(",")
+                     ) {
+                    ans.addAtomicProposition(s.replace("="," = "));
+                    ans.addLabel(newState,s.replace("="," = "));
+                }
+                //ans.addAtomicProposition(sb.toString().substring(0, sb.toString().length() - 1).replace("=", " = "));
+                //ans.addLabel(newState, sb.toString().substring(0, sb.toString().length() - 1).replace("=", " = "));
                 StringBuilder sb2 = new StringBuilder();
                 for (Map.Entry e : eval.entrySet()
                         ) {
                     sb2.append(e.getKey() + "=" + e.getValue() + ",");
                 }
-                if (sb2.toString().length() >0) {
+                if (sb2.toString().length() > 0) {
                     State fromState = new State("[location=" + trans.getFrom().getLabel() + ", eval={" + sb2.toString().substring(0, sb2.toString().length() - 1) + "}]");
                     if (ans.getStates().contains(fromState))
                         ans.addTransition(new Transition(fromState, new Action(trans.getAction()), newState));
@@ -566,7 +574,6 @@ public class Ex3FacadeImpl implements Ex3Facade {
                 State fromState = new State("[location=" + trans.getFrom().getLabel() + ", eval={}]");
                 ans.addState(fromState);
                 ans.addTransition(new Transition(fromState, new Action(trans.getAction()), newState));
-
             }
         });
     }
@@ -594,16 +601,19 @@ public class Ex3FacadeImpl implements Ex3Facade {
                 for (List<String> ls : pg.getInitalizations()
                         ) {
                     StringBuilder sb = new StringBuilder();
+
                     for (String s : ls
                             ) {
-                        sb.append(s.split(":")[0] + s.split(":")[1] + ",");
+                        if (s.contains(":"))
+                            sb.append(s.split(":")[0] + s.split(":")[1] + ",");
                     }
-                    State newState = new State("[location=" + loc.getLabel() + ", eval=" + "{" + sb.toString().substring(0, sb.toString().length() - 1) + "}]");
-                    ans.addState(newState);
-                    ans.addInitialState(newState);
+                    if (sb.toString().length() > 2) {
+                        State newState = new State("[location=" + loc.getLabel() + ", eval=" + "{" + sb.toString().substring(0, sb.toString().length() - 1) + "}]");
+                        ans.addState(newState);
+                        ans.addInitialState(newState);
+                    }
                 }
-            }
-            else{
+            } else {
                 ans.addState(new State("[location=" + loc.getLabel() + ", eval=" + "{}]"));
                 ans.addInitialState(new State("[location=" + loc.getLabel() + ", eval=" + "{}]"));
             }
@@ -695,9 +705,11 @@ public class Ex3FacadeImpl implements Ex3Facade {
         for (Location l : ans.getLocations()
                 ) {
             if (l.getLabel().contains(";") && !ans.getInitialLocations().contains(l)) {
-                String toParse = l.getLabel().substring(1, l.getLabel().length() - 1).replace("do", "do ").replace("od", " od").replace("if","if ").replace("fi"," fi");
+                String toParse = l.getLabel().substring(1, l.getLabel().length() - 1).replace("do", "do ").replace("od", " od").replace("if", "if ").replace("fi", " fi");
                 if (toParse.contains("odo"))
-                    toParse = toParse.replace("odo d","od od");
+                    toParse = toParse.replace("odo d", "od od");
+                if (toParse.contains("s oda"))
+                    toParse = toParse.replace("s oda","soda");
                 NanoPromelaParser.StmtContext head = NanoPromelaFileReader.pareseNanoPromelaString(toParse);
                 getTransitionsForConcatenation(head, temp);
             }

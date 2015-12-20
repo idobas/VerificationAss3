@@ -123,7 +123,7 @@ public class TransitionImpl implements TransitionSystem {
         for (Transition t : this.transitions
                 ) {
             if (t.getAction().equals(action))
-                throw new DeletionOfAttachedActionException(action, TransitionSystemPart.ACTIONS);
+                throw new DeletionOfAttachedActionException(action, TransitionSystemPart.TRANSITIONS);
         }
         this.actions.remove(action);
     }
@@ -133,7 +133,7 @@ public class TransitionImpl implements TransitionSystem {
         for (Map.Entry<State, Set<String>> e : this.labels.entrySet()
                 ) {
             if (e.getValue().contains(p))
-                throw new DeletionOfAttachedAtomicPropositionException(p, TransitionSystemPart.ATOMIC_PROPOSITIONS);
+                throw new DeletionOfAttachedAtomicPropositionException(p, TransitionSystemPart.LABELING_FUNCTION);
         }
         this.ap.remove(p);
     }
@@ -153,11 +153,11 @@ public class TransitionImpl implements TransitionSystem {
     @Override
     public void removeState(State state) throws FVMException {
         if (this.labels.containsKey(state) && !(this.labels.get(state).size() == 0))
-            throw new DeletionOfAttachedStateException(state, TransitionSystemPart.STATES);
+            throw new DeletionOfAttachedStateException(state, TransitionSystemPart.LABELING_FUNCTION);
         else if (this.initialStates.contains(state))
-            throw new DeletionOfAttachedStateException(state, TransitionSystemPart.STATES);
+            throw new DeletionOfAttachedStateException(state, TransitionSystemPart.INITIAL_STATES);
         else if (!isStateInTransitions(state))
-            throw new DeletionOfAttachedStateException(state, TransitionSystemPart.STATES);
+            throw new DeletionOfAttachedStateException(state, TransitionSystemPart.TRANSITIONS);
         else
             this.states.remove(state);
     }

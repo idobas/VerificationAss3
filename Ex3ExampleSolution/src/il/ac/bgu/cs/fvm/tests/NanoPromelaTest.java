@@ -499,7 +499,9 @@ public class NanoPromelaTest {
 		ts.addInitialState(s0);
 
 		ts.addAction(new Action(""));
-
+        ts.addAction(new Action("y:=x+y"));
+        ts.addAction(new Action("x:=0"));
+        ts.addAction(new Action("y:=x"));
 		ts.addTransition(new Transition(s0, new Action(""), s1));
 
 		return ts;
